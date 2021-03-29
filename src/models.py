@@ -13,6 +13,7 @@ class ContainerParameters(BaseModel):
     devices: Optional[List[str]]
     tmpfs: Optional[Dict]
     volumes: Optional[Dict]
+    nano_cpus: Optional[int]
 
 
 class Container(BaseModel):

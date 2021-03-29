@@ -86,7 +86,9 @@ def containers_start(client: docker.DockerClient, containers: List[Container]):
             with docker_config_path.open("w") as fp:
                 fp.write(container.auth)
 
-        client.containers.run(**container.parameters.dict(), detach=True, restart_policy=dict(Name="always"))
+        client.containers.run(
+            **container.parameters.dict(exclude_unset=True), detach=True, restart_policy=dict(Name="always")
+        )
 
         # remove auth
         if container.auth:

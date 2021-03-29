@@ -7,6 +7,12 @@ class ContainerParameters(BaseModel):
     name: str
     image: str
     environment: List[str] = []
+    network_mode: Optional[str]
+    cpu_period: Optional[int]
+    cpu_quota: Optional[int]
+    devices: Optional[List[str]]
+    tmpfs: Optional[Dict]
+    volumes: Optional[Dict]
 
 
 class Container(BaseModel):

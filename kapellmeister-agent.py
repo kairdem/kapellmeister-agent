@@ -21,7 +21,7 @@ env = EnvYAML()
 
 def containers_diff(actual: DockerContainer, container: Container) -> bool:
     # check environment
-    if any([env_ not in actual.attrs['Config']['Env'] for env_ in container.parameters.environment]):
+    if any([env_ not in actual.attrs["Config"]["Env"] for env_ in container.parameters.environment]):
         return True
 
     if actual.attrs.get("Image", "") != container.digest:
@@ -30,17 +30,15 @@ def containers_diff(actual: DockerContainer, container: Container) -> bool:
     return False
 
 
-def containers_check(client: docker.DockerClient, containers: List[Container]) -> Tuple[
-    List[Container],
-    List[Container],
-    List[str]
-]:
+def containers_check(
+    client: docker.DockerClient, containers: List[Container]
+) -> Tuple[List[Container], List[Container], List[str]]:
     create: List[Container] = []
     update: List[Container] = []
     remove: List[str] = []
 
     # get list of containers
-    running: List[DockerContainer] = client.containers.list(all=True)
+    running: List[DockerContainer] = [c for c in client.containers.list(all=True) if c.name != env["name"]]
 
     # requests
     requested_names: Set[str] = {c.parameters.name for c in containers}
@@ -73,7 +71,7 @@ def containers_remove(client: docker.DockerClient, containers: List[str]):
 
 
 def containers_start(client: docker.DockerClient, containers: List[Container]):
-    docker_config_path: Path = Path.joinpath(Path.home(), '.docker', 'config.json')
+    docker_config_path: Path = Path.joinpath(Path.home(), ".docker", "config.json")
 
     for container in containers:
         # create auth
@@ -81,11 +79,7 @@ def containers_start(client: docker.DockerClient, containers: List[Container]):
             with open(docker_config_path, "w") as fp:
                 fp.write(container.auth)
 
-        client.containers.run(
-            **container.parameters.dict(),
-            detach=True,
-            restart_policy=dict(Name='always')
-        )
+        client.containers.run(**container.parameters.dict(), detach=True, restart_policy=dict(Name="always"))
 
         # remove auth
         if container.auth:
@@ -106,9 +100,9 @@ def containers_update(client: docker.DockerClient, containers: List[Container]):
 
 def app_main():
     # get containers from management server
-    management_url: str = env['management.url']
-    management_project: str = env['management.project']
-    management_channel: str = env['management.channel']
+    management_url: str = env["management.url"]
+    management_project: str = env["management.project"]
+    management_channel: str = env["management.channel"]
 
     # get docker client
     client = docker.from_env()
@@ -136,8 +130,8 @@ def app_main():
             containers_update(client, update)
 
         # time to sleep
-        sleep(env['request.timeout'])
+        sleep(env["request.timeout"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app_main()

@@ -31,7 +31,7 @@ def containers_diff(actual: DockerContainer, container: Container) -> bool:
 
 
 def containers_check(
-    client: docker.DockerClient, containers: List[Container]
+        client: docker.DockerClient, containers: List[Container]
 ) -> Tuple[List[Container], List[Container], List[str]]:
     create: List[Container] = []
     update: List[Container] = []
@@ -76,7 +76,11 @@ def containers_start(client: docker.DockerClient, containers: List[Container]):
     for container in containers:
         # create auth
         if container.auth:
-            with open(docker_config_path, "w") as fp:
+            # create a .docker folder
+            Path.joinpath(Path.home(), ".docker").mkdir(parents=True, exist_ok=True)
+
+            # write config
+            with docker_config_path.open("w") as fp:
                 fp.write(container.auth)
 
         client.containers.run(**container.parameters.dict(), detach=True, restart_policy=dict(Name="always"))

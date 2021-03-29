@@ -31,18 +31,21 @@ def containers_diff(actual: DockerContainer, container: Container) -> bool:
 
 
 def containers_check(
-        client: docker.DockerClient, containers: List[Container]
+    client: docker.DockerClient, containers: List[Container]
 ) -> Tuple[List[Container], List[Container], List[str]]:
     create: List[Container] = []
     update: List[Container] = []
     remove: List[str] = []
+
+    # delete stopped containers
+    client.containers.prune()
 
     # get list of containers
     running: List[DockerContainer] = [c for c in client.containers.list(all=True) if c.name != env["name"]]
 
     # requests
     requested_names: Set[str] = {c.parameters.name for c in containers}
-    running_names: Set[str] = {r.name for r in running}
+    running_names: Set[str] = {r.name for r in running if r.status == "running"}
 
     # find new container to run
     for container in containers:
@@ -83,7 +86,9 @@ def containers_start(client: docker.DockerClient, containers: List[Container]):
             with docker_config_path.open("w") as fp:
                 fp.write(container.auth)
 
-        client.containers.run(**container.parameters.dict(), detach=True, restart_policy=dict(Name="always"))
+        client.containers.run(
+            **container.parameters.dict(exclude_unset=True), detach=True, restart_policy=dict(Name="always")
+        )
 
         # remove auth
         if container.auth:

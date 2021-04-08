@@ -4,6 +4,7 @@ from time import sleep
 from typing import List, Set, Tuple
 
 import docker
+from docker.errors import DockerException
 from docker.models.containers import Container as DockerContainer
 from envyaml import EnvYAML
 
@@ -24,6 +25,7 @@ def containers_diff(actual: DockerContainer, container: Container) -> bool:
     if any([env_ not in actual.attrs["Config"]["Env"] for env_ in container.parameters.environment]):
         return True
 
+    # check image hash
     if actual.attrs.get("Image", "") != container.digest:
         return True
 
@@ -45,7 +47,7 @@ def containers_check(
 
     # requests
     requested_names: Set[str] = {c.parameters.name for c in containers}
-    running_names: Set[str] = {r.name for r in running if r.status == "running"}
+    running_names: Set[str] = {r.name for r in running}
 
     # find new container to run
     for container in containers:
@@ -68,14 +70,26 @@ def containers_check(
     return create, update, remove
 
 
-def containers_remove(client: docker.DockerClient, containers: List[str]):
+def containers_remove(client: docker.DockerClient, containers: List[str], remove_image: bool = False):
     for name in containers:
-        client.containers.get(name).remove(force=True)
+        try:
+            container: DockerContainer = client.containers.get(name)
+
+            # remove container
+            container.remove(force=True)
+
+            # remove image
+            if remove_image:
+                client.images.remove(image=container.image.tags[0], force=True)
+
+        except DockerException as err:
+            print("Docker remove exception:", err)
 
 
 def containers_start(client: docker.DockerClient, containers: List[Container]):
     docker_config_path: Path = Path.joinpath(Path.home(), ".docker", "config.json")
 
+    # create new containers
     for container in containers:
         # create auth
         if container.auth:
@@ -85,10 +99,14 @@ def containers_start(client: docker.DockerClient, containers: List[Container]):
             # write config
             with docker_config_path.open("w") as fp:
                 fp.write(container.auth)
+        try:
+            client.containers.run(
+                **container.parameters.dict(exclude_unset=True), detach=True, restart_policy=dict(Name="always")
+            )
 
-        client.containers.run(
-            **container.parameters.dict(exclude_unset=True), detach=True, restart_policy=dict(Name="always")
-        )
+            log.info(f"Start container: {container.parameters.name}")
+        except DockerException as err:
+            print("Docker start exception:", err)
 
         # remove auth
         if container.auth:
@@ -98,10 +116,7 @@ def containers_start(client: docker.DockerClient, containers: List[Container]):
 def containers_update(client: docker.DockerClient, containers: List[Container]):
     for container in containers:
         # remove
-        containers_remove(client, [container.slug])
-
-        # remove image
-        client.images.remove(image=container.parameters.image, force=True)
+        containers_remove(client, [container.parameters.name], remove_image=True)
 
         # start over
         containers_start(client, [container])
